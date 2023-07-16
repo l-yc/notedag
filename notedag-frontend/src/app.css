@@ -1,3 +1,19 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+	h1 {
+		@apply text-4xl;
+	}
+
+	h2 {
+		@apply text-3xl;
+	}	
+}
+
+@layer components {
+	.clickable {
+		@apply hover:bg-slate-100 hover:cursor-pointer;
+	}
+}
