@@ -2,6 +2,7 @@
 
 const ENDPOINT = "http://127.0.0.1:8080/";
 
+// server proxies REST api calls
 export const api = {
 	get: (fn: string, params: Record<string, string>) => fetch(`${ENDPOINT}${fn}?` + new URLSearchParams(params)),
 	post: (fn: string, params: Record<string, string>) => fetch(`${ENDPOINT}${fn}`, {
@@ -11,4 +12,9 @@ export const api = {
 			"Content-Type": "application/json",
 		},
 	})
+}
+
+// for now, we'll connect directly
+export const kernel = {
+	uri: 'ws://127.0.0.1:8080/kernel',
 }
