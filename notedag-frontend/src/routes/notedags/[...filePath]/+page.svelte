@@ -13,6 +13,7 @@
 	interface CellOutput {
 		value: string;
 		error: string;
+		result: string;
 		executionCount: string;
 	}
 
@@ -38,12 +39,21 @@
 		}
 	}
 
+	function defaultOutput() {
+		return {
+			value: '',
+			error: '',
+			result: '',
+			executionCount: ' ',
+		}
+	}
+
 	function addNewCell() {
 		notedag.cells.push({
 			id: uuidv4(),
 			code: { value: '', syntax: 'code', },
 			meta: {},
-			output: { value: '', error: '',  executionCount: ' ' },
+			output: defaultOutput(),
 		});
 
 		notedag = notedag;
@@ -57,14 +67,8 @@
 				"Content-Type": "application/json",
 			},
 		});
-	}
-
-	function defaultOutput() {
-return {
-				value: '',
-				error: '',
-				executionCount: ' ',
-			}
+		const json = await response.json();
+		alert(JSON.stringify(json));
 	}
 
 	function clearOutput() {
@@ -105,16 +109,41 @@ return {
 				try {
 					const { id, name, value, status } = JSON.parse(msg.data);
 
+
 					if (id !== undefined) {
 						for (let cell of notedag.cells) {
 							if (cell.id === id) {
 								switch (name) {
 									case 'output':
 									case 'error':
+										console.log(value);
 										let escaped = new Option(value).innerHTML;
-										var convert = new Convert();
-										cell.output.value = convert.toHtml(escaped);
+										let convert = new Convert();
+										let html = convert.toHtml(escaped);
+										if (name == 'output') cell.output.value = html;
+										else cell.output.error = html;
 										break;
+									case 'result':
+									case 'data':
+										let json: Record<string, string> = JSON.parse(value);
+										const contentTypeHandler: Record<string, ((s: string) => string)> = {
+											'text/plain': (s: string) => {
+												let pre = document.createElement('pre');
+												pre.innerText = s;
+												return pre.outerHTML;
+											},
+											'image/png': (s: string) => {
+												let img = document.createElement('img');
+												img.src = 'data:image/png;base64,' + s;
+												return img.outerHTML;
+											}
+										};
+										cell.output.result = '';
+										for (let [k, v] of Object.entries(json)) {
+											cell.output.result += contentTypeHandler[k](v);
+										}
+										break;
+									case 'queued':
 									case 'running':
 									case 'complete':
 										cell.output.executionCount = value;
@@ -181,14 +210,18 @@ return {
 			<ul class="flex flex-col">
 				{#each notedag.cells as cell}
 					<li class="flex">
-						<div class="flex flex-col">
+						<div class="flex flex-col mx-2">
 							<pre class="m-2">[{cell.output.executionCount}]</pre>
 							<input type="button" class="px-4 py-2 clickable" value="Run" on:click={(event) => run(cell)}/>
 						</div>
-						<div class="flex-1 flex flex-col">
-							<pre class="m-2 p-2 bg-slate-100" contenteditable bind:innerText={cell.code.value}></pre>
+						<div class="flex-1 flex flex-col mx-2">
+							<pre class="my-2 p-2 bg-slate-100" contenteditable bind:innerText={cell.code.value}></pre>
 							<!-- FIXME: this is vulnerable to XSS. Ok if we're just running local (trusted) notebooks but we should really fix it -->
-							<pre class="m-2">{@html cell.output.value}</pre>
+							<div class="p-2">
+								<pre>{@html cell.output.value}</pre>
+								<pre>{@html cell.output.error}</pre>
+								<div>{@html cell.output.result}</div>
+							</div>
 						</div>
 					</li>
 				{/each}
