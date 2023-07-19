@@ -689,8 +689,6 @@ dependencies = [
 [[package]]
 name = "jupyter-client"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "744489c71a315bc7c7490a74fe1778ae7e33e70adefac5582704652da9532026"
 dependencies = [
  "chrono",
  "digest 0.8.1",
