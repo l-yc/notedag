@@ -2,8 +2,12 @@
     /** @type {import('./$types').PageData} */
 	export let data : PageData;
 	import { kernel } from '$lib';
+	import type { Keybind } from "$lib/keybindings";
+	import { registerDocumentKeybindings } from "$lib/keybindings";
 	import { v4 as uuidv4 } from 'uuid';
 	import Convert from 'ansi-to-html';
+
+	import { onMount } from 'svelte';
 
 	type UUID = string;
 
@@ -47,7 +51,7 @@
 
 	let notedag: NoteDAG = NoteDAGFromJSON(data.contents);
 	let focusedGroup: UUID = notedag.root;
-	let focusedCell: UUID | null = notedag.groups[notedag.root].cells.at(0)?.id || null;
+	let focusedCell: UUID = notedag.groups[notedag.root].cells[0];
 
 	function defaultCellOutput(): CellOutput {
 		return {
@@ -114,17 +118,57 @@
 	$: activeGroupChain = getActiveGroupChain(notedag);
 
 	/// handlers
+	function focusGroup(groupId: UUID) {
+		const group = notedag.groups[groupId];
+		const cellId = group.cells.indexOf(focusedCell) === -1 ? group.cells[0] : focusedCell;
+		focusCell(groupId, cellId);
+	}
+
+	function focusCell(groupId: UUID, cellId: UUID) {
+		focusedGroup = groupId;
+		focusedCell = cellId;
+		notedag = notedag;
+	}
+
+	function focusCellBefore(groupId: UUID, cellId: UUID) {
+		const group = notedag.groups[groupId];
+		const idx = group.cells.indexOf(cellId);
+		if (idx > 0) focusCell(groupId, group.cells[idx - 1])
+	}
+
+	function focusCellAfter(groupId: UUID, cellId: UUID) {
+		const group = notedag.groups[groupId];
+		const idx = group.cells.indexOf(cellId);
+		if (idx < group.cells.length - 1) focusCell(groupId, group.cells[idx + 1])
+	}
+
 	function addNewCell(groupId: UUID, idx?: number) {
 		const newCell = defaultCell();
 		notedag.cells[newCell.id] = newCell;
 		if (idx === undefined) notedag.groups[groupId].cells.push(newCell.id);
 		else notedag.groups[groupId].cells.splice(idx, 0, newCell.id);
+
+		focusedCell = newCell.id;
+
 		notedag = notedag;
+	}
+
+	function addNewCellBefore(groupId: UUID, cellId: UUID) {
+		const group = notedag.groups[groupId];
+		const idx = group.cells.indexOf(cellId);
+		addNewCell(groupId, idx);
+	}
+
+	function addNewCellAfter(groupId: UUID, cellId: UUID) {
+		const group = notedag.groups[groupId];
+		const idx = group.cells.indexOf(cellId);
+		addNewCell(groupId, idx+1);
 	}
 
 	function addNewGroup(groupId?: UUID) {
 		const newGroup = defaultGroup();
 		notedag.groups[newGroup.id] = newGroup;
+		addNewCell(newGroup.id);
 		
 		if (groupId === undefined) {
 			var parent = notedag.groups[focusedGroup];
@@ -133,16 +177,22 @@
 		}
 		parent.dependentGroups.push(newGroup.id);
 		parent.nextGroup = newGroup.id;
+
+		focusGroup(newGroup.id);
 		notedag = notedag;
 	}
 
 	async function deleteCell(cellId: UUID, groupId: UUID) {
 		delete notedag.cells[cellId];
-		if (focusedCell === cellId) focusedCell = null;
 
 		let group = notedag.groups[groupId];
 		const idx = group.cells.indexOf(cellId);
 		group.cells.splice(idx, 1);
+
+		if (focusedCell === cellId) {
+			focusedCell = group.cells[Math.min(idx, group.cells.length-1)];
+		}
+
 		notedag = notedag;
 	}
 
@@ -157,14 +207,17 @@
 			alert('cannot delete group with dependent groups');
 			return;
 		}
-
 		delete notedag.groups[groupId];
-		if (focusedGroup === groupId) focusedGroup = notedag.root;
 
-		let parent = notedag.groups[parentGroupId];
+		const parent = notedag.groups[parentGroupId];
 		const idx = parent.dependentGroups.indexOf(groupId);
 		parent.dependentGroups.splice(idx, 1);
 		if (parent.nextGroup === groupId) parent.nextGroup = parent.dependentGroups[Math.min(idx, parent.dependentGroups.length-1)] || null;
+
+		if (focusedGroup === groupId) {
+			if (parent.nextGroup === null) focusGroup(parent.id);
+			else focusGroup(parent.nextGroup);
+		}
 
 		notedag = notedag;
 	}
@@ -187,6 +240,39 @@
 		}
 		notedag = notedag;
 	}
+
+	/// lifecycle
+	onMount(() => {
+		const kb: Keybind[] = [
+		  {
+			keys: ["a"],
+			description: "Add cell above",
+			run: () => addNewCellBefore(focusedGroup, focusedCell),
+		  },
+		  {
+			keys: ["b"],
+			description: "Add cell below",
+			run: () => addNewCellAfter(focusedGroup, focusedCell),
+		  },
+		  {
+			keys: ["k"],
+			description: "Focus cell above",
+			run: () => focusCellBefore(focusedGroup, focusedCell),
+		  },
+		  {
+			keys: ["j"],
+			description: "Focus cell after",
+			run: () => focusCellAfter(focusedGroup, focusedCell),
+		  },
+		  {
+			keys: ["Shift-Enter"],
+			description: "Add cell after",
+			run: () => runCell(notedag.cells[focusedCell]),
+		  },
+		];
+
+		registerDocumentKeybindings(kb);
+	});
 
 	/// kernel
 	let connection = {
@@ -245,7 +331,6 @@
 									'text/html': (s: string) => {
 										let div = document.createElement('div');
 										div.innerHTML = s;
-										console.log('hi');
 										return div.outerHTML;
 									},
 									'image/png': (s: string) => {
@@ -353,7 +438,7 @@
 		{:else}
 			<ul class="flex flex-col">
 				{#each activeGroupChain as group, idx}
-					<li class="m-2" on:click={(_event) => {focusedGroup = group.id}}>
+					<li class="m-2" on:click={(_event) => focusGroup(group.id)}>
 						<ul class="flex">
 							{#if idx === 0}
 								<span class="border border-2 px-2 border-blue-500" contenteditable bind:innerText={group.name}></span>
@@ -362,7 +447,7 @@
 									{#if dependentId === group.id}
 										<span class="border border-2 border-blue-500 flex">
 											<span class="px-2" contenteditable bind:innerText={group.name}></span>
-											<span class="flex content-center items-center ml-2 px-1 hover:bg-slate-200 cursor-pointer" on:click={(_) => deleteGroup(group.id, activeGroupChain[idx-1].id)}>
+											<span class="flex content-center items-center ml-2 px-1 hover:bg-slate-200 cursor-pointer" on:click={(_) => deleteGroup(dependentId, activeGroupChain[idx-1].id)}>
 												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
 													<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 												</svg>
@@ -370,9 +455,9 @@
 										</span> 
 
 									{:else}
-										<span class="border border-2 clickable flex" on:click={(_event) => {activeGroupChain[idx-1].nextGroup = dependentId; notedag = notedag}}>
+										<span class="border border-2 clickable flex" on:click={(_event) => {activeGroupChain[idx-1].nextGroup = dependentId; focusGroup(dependentId)}}>
 											<span class="px-2">{notedag.groups[dependentId].name}</span>
-											<span class="flex content-center items-center ml-2 px-1 hover:bg-slate-200 cursor-pointer" on:click={(_) => deleteGroup(group.id, activeGroupChain[idx-1].id)}>
+											<span class="flex content-center items-center ml-2 px-1 hover:bg-slate-200 cursor-pointer" on:click={(_) => deleteGroup(dependentId, activeGroupChain[idx-1].id)}>
 												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
 													<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 												</svg>
@@ -392,11 +477,11 @@
 							<span class="px-3 clickable" on:click={(_) => clearGroup(group)}>Clear Group</span>
 						</ul>
 
-						<ul class="border border-2 flex flex-col {focusedGroup === group.id ? 'border-blue-500' : ''}">
+						<ul class="flex flex-col border-2">
 							<!--<pre>{group.id}</pre>-->
 
 							{#each group.cells.map(id => notedag.cells[id]) as cell}
-								<li class="flex py-2">
+								<li class="flex py-2 border-2 {focusedCell === cell.id ? 'border-blue-500' : 'border-white hover:border-slate-200'}" on:click={(_event) => {focusCell(group.id, cell.id)}}>
 									<div class="flex flex-col w-14 items-end">
 										<pre class="mx-2">[{cell.output.executionCount}]</pre>
 									</div>
@@ -410,11 +495,13 @@
 										</div>
 									</div>
 									<ul class="flex flex-col px-2">
-										<a class="clickable mb-1" on:click={(_event) => deleteCell(cell.id, group.id)}>
-											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
-												<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-											</svg>
-										</a>
+										{#if group.cells.length > 1}
+											<a class="clickable mb-1" on:click={(_event) => deleteCell(cell.id, group.id)}>
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+												</svg>
+											</a>
+										{/if}
 										<a class="clickable" on:click={(_event) => runCell(cell)}>
 											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
 												<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
