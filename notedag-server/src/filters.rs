@@ -182,6 +182,7 @@ mod kernel {
                     if let Response::IoPub(response) = msg {
                         let opt = last_run_cell.read().unwrap();
                         let output = opt.as_ref().and_then(|run_cell| {
+                            dbg!(&response);
                             match response {
                                 IoPubResponse::Stream { content, .. } => Some(RunCellUpdate {
                                     id: run_cell.id.clone(),
@@ -194,15 +195,33 @@ mod kernel {
                                         name: String::from("error"),
                                         value: content.traceback.join("\n"),
                                     })
-                                }
+                                },
                                 IoPubResponse::Status { content, .. } => {
                                     println!("status update: {:?}", content);
                                     None
-                                }
-                                _ => {
-                                    dbg!(response);
-                                    None
-                                }
+                                },
+                                IoPubResponse::ExecuteInput { .. } => {
+                                    Some(RunCellUpdate {
+                                        id: run_cell.id.clone(),
+                                        name: String::from("queued"),
+                                        value: "*".into(),
+                                    })
+                                },
+                                IoPubResponse::ExecuteResult { content, .. } => {
+                                    Some(RunCellUpdate {
+                                        id: run_cell.id.clone(),
+                                        name: String::from("result"),
+                                        value: serde_json::to_string(&content.data).unwrap()
+                                    })
+                                },
+                                IoPubResponse::DisplayData { content, .. } => {
+                                    Some(RunCellUpdate {
+                                        id: run_cell.id.clone(),
+                                        name: String::from("data"),
+                                        value: serde_json::to_string(&content.data).unwrap()
+                                    })
+                                },
+                                _ => None
                             }
                         });
 
@@ -262,7 +281,7 @@ mod kernel {
             let mut r = last_run_cell.write().unwrap();
             *r = Some(run_cell.clone());
         }
-        println!("running: {}", run_cell.value);
+        println!("submitting: {}", run_cell.value);
 
         // Command to run
         let command = Command::Execute {
@@ -276,8 +295,8 @@ mod kernel {
 
         let cell_output = RunCellUpdate {
             id: run_cell.id.clone(),
-            name: String::from("running"),
-            value: "*".into(),
+            name: String::from("queued"),
+            value: ":".into(),
         };
 
         let new_msg = serde_json::to_string(&cell_output).unwrap();

@@ -689,6 +689,7 @@ dependencies = [
 [[package]]
 name = "jupyter-client"
 version = "0.1.0"
+source = "git+https://github.com/l-yc/rust-jupyter-client#96defb707970617f9e53ab40b7f2a6bb74c6b469"
 dependencies = [
  "chrono",
  "digest 0.8.1",
