@@ -308,6 +308,13 @@
 		}
 	}
 
+	function clearGroup(group: Group) {
+		for (let id in group.cells) {
+			notedag.cells[id].output = defaultCellOutput();
+		}
+		notedag = notedag;
+	}
+
 	async function runActiveGroupChain() {
 		for (let group of activeGroupChain) {
 			await runGroup(group);
@@ -315,26 +322,32 @@
 	}
 </script>
 
-<div class="4xl: max-w-4xl mx-auto p-4">
-	<h1>NoteDag</h1>
-
-	<h2>Viewer</h2>
+<div>
+	<div class="sticky top-0 bg-white">
+		<div class="flex items-end py-2 px-4 constrained">
+			<h1>NoteDAG</h1>
+			<p class="ml-4 text-xl" contenteditable>{data.filename}</p>
+		</div>
+		<hr class="border-b">
+		<div class="flex constrained">
+			<span class="px-4 py-1">
+				Status: {connection.status}
+			</span>
+			<span class="flex-1"></span>
+			<input type="button" class="px-3 py-1 clickable" value="Connect" on:click={(_event) => connect()}/>
+			<input type="button" class="px-3 py-1 clickable" value="Save" on:click={(_event) => save(data.root)}/>
+			<input type="button" class="px-3 py-1 clickable" value="Add Group" on:click={(_event) => addNewGroup()}/>
+			<input type="button" class="px-3 py-1 clickable" value="Run All" on:click={(_event) => runActiveGroupChain()}/>
+			<input type="button" class="px-3 py-1 clickable" value="Clear All" on:click={(_event) => clearOutput()}/>
+		</div>
+		<hr class="border-b-2 border-slate-500">
+	</div>
 
 	<!--<p>{JSON.stringify(notedag)}</p>-->
 	<!--<p>{focusedGroup}</p>-->
 	<!--<p>{JSON.stringify(activeGroupChain)}</p>-->
 
-	<div class="border border-2 flex flex-col">
-		<div class="flex">
-			<span class="px-4 py-2">Status: {connection.status}</span>
-			<span class="flex-1"></span>
-			<input type="button" class="px-4 py-2 clickable" value="Connect" on:click={(_event) => connect()}/>
-			<input type="button" class="px-4 py-2 clickable" value="Add Group" on:click={(_event) => addNewGroup()}/>
-			<input type="button" class="px-4 py-2 clickable" value="Save" on:click={(_event) => save(data.root)}/>
-			<input type="button" class="px-4 py-2 clickable" value="Run All" on:click={(_event) => runActiveGroupChain()}/>
-			<input type="button" class="px-4 py-2 clickable" value="Clear All" on:click={(_event) => clearOutput()}/>
-		</div>
-
+	<div class="flex flex-col constrained">
 		{#if notedag === null }
 			<p>error in notedag</p>
 		{:else}
@@ -343,39 +356,51 @@
 					<li class="m-2" on:click={(_event) => {focusedGroup = group.id}}>
 						<ul class="flex">
 							{#if idx === 0}
-								<span class="border border-2 px-2 border-red-500" contenteditable bind:innerText={group.name}></span>
+								<span class="border border-2 px-2 border-blue-500" contenteditable bind:innerText={group.name}></span>
 							{:else}
 								{#each activeGroupChain[idx-1].dependentGroups as dependentId}
 									{#if dependentId === group.id}
-										<span class="border border-2 px-2 border-red-500" contenteditable bind:innerText={group.name}></span>
+										<span class="border border-2 border-blue-500 flex">
+											<span class="px-2" contenteditable bind:innerText={group.name}></span>
+											<span class="flex content-center items-center ml-2 px-1 hover:bg-slate-200 cursor-pointer" on:click={(_) => deleteGroup(group.id, activeGroupChain[idx-1].id)}>
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+												</svg>
+											</span>
+										</span> 
+
 									{:else}
-										<span class="border border-2 px-2 clickable" on:click={(_event) => {activeGroupChain[idx-1].nextGroup = dependentId; notedag = notedag}}>
-											{notedag.groups[dependentId].name}
+										<span class="border border-2 clickable flex" on:click={(_event) => {activeGroupChain[idx-1].nextGroup = dependentId; notedag = notedag}}>
+											<span class="px-2">{notedag.groups[dependentId].name}</span>
+											<span class="flex content-center items-center ml-2 px-1 hover:bg-slate-200 cursor-pointer" on:click={(_) => deleteGroup(group.id, activeGroupChain[idx-1].id)}>
+												<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+												</svg>
+											</span>
 										</span>
 									{/if}
 								{/each}
-								<input type="button" class="px-2 clickable" value="+" on:click={(_event) => addNewGroup(activeGroupChain[idx-1]?.id)}/>
+								<a class="flex content-center items-center px-1 clickable" on:click={(_event) => addNewGroup(activeGroupChain[idx-1]?.id)}>
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+									</svg>
+								</a>
 							{/if}
 							<span class="flex-1"></span>
-							<span class="border border-2 px-2 clickable" on:click={(_) => addNewCell(group.id)}>Add Cell</span>
+							<span class="px-3 clickable" on:click={(_) => addNewCell(group.id)}>Add Cell</span>
+							<span class="px-3 clickable" on:click={(_) => runGroup(group)}>Run Group</span>
+							<span class="px-3 clickable" on:click={(_) => clearGroup(group)}>Clear Group</span>
 						</ul>
 
-						<ul class="border border-2 flex flex-col p-2 {focusedGroup === group.id ? 'border-red-500' : ''}">
-							<div class="mb-4 flex">
-								<pre>{group.id}</pre>
-								<span class="flex-1"></span>
-								<span class="ml-2 px-2 clickable" on:click={(_) => runGroup(group)}>Run All</span>
-								{#if idx > 0}
-									<span class="ml-2 px-2 clickable" on:click={(_) => deleteGroup(group.id, activeGroupChain[idx-1].id)}>Delete</span>
-								{/if}
-							</div>
+						<ul class="border border-2 flex flex-col {focusedGroup === group.id ? 'border-blue-500' : ''}">
+							<!--<pre>{group.id}</pre>-->
 
 							{#each group.cells.map(id => notedag.cells[id]) as cell}
-								<li class="flex">
-									<div class="flex flex-col mx-2">
+								<li class="flex py-2">
+									<div class="flex flex-col w-14 items-end">
 										<pre class="mx-2">[{cell.output.executionCount}]</pre>
 									</div>
-									<div class="flex-1 flex flex-col mx-2">
+									<div class="flex-1 flex flex-col">
 										<pre class="p-2 bg-slate-100" contenteditable bind:innerText={cell.code.value}></pre>
 										<!-- FIXME: this is vulnerable to XSS. Ok if we're just running local (trusted) notebooks but we should really fix it -->
 										<div class="p-2">
@@ -384,9 +409,17 @@
 											<div>{@html cell.output.result}</div>
 										</div>
 									</div>
-									<ul class="flex flex-col mx-2">
-										<input type="button" class="clickable" value="X" on:click={(_event) => deleteCell(cell.id, group.id)}/>
-										<input type="button" class="clickable" value="Run" on:click={(_event) => runCell(cell)}/>
+									<ul class="flex flex-col px-2">
+										<a class="clickable mb-1" on:click={(_event) => deleteCell(cell.id, group.id)}>
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</a>
+										<a class="clickable" on:click={(_event) => runCell(cell)}>
+											<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+											</svg>
+										</a>
 									</ul>
 								</li>
 							{/each}

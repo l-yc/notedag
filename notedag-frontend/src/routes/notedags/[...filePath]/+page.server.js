@@ -8,8 +8,11 @@ export async function load({ fetch, params }) {
 	}));
 	const { contents } = await response.json();
 
+	let tokens = filePath.split('/');
+	const filename = tokens[tokens.length-1];
 	return {
 		root: filePath,
+		filename,
 		contents,
 	}
 }

@@ -16,4 +16,8 @@
 	.clickable {
 		@apply hover:bg-slate-100 hover:cursor-pointer;
 	}
+
+	.constrained {
+		@apply lg:max-w-4xl mx-auto;
+	}
 }
