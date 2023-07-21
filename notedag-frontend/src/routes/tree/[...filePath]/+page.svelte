@@ -48,13 +48,20 @@
 			</a>
 			{/if}
 
-			{#each data.files as {fileName, filePath, isDir}}
-			<a 
-				class="px-4 py-2 clickable"
-				href={`/${isDir ? 'tree' : 'notedags'}/${getLoc(data.root, fileName)}`}
-			>
-				<li>{fileName}</li>
-			</a>
+			{#each data.files as {fileName, isDir, size, modified}}
+				<a
+					class="px-4 py-2 clickable"
+					href={`/${isDir ? 'tree' : 'notedags'}/${getLoc(data.root, fileName)}`}
+				>
+					<li class="flex">
+						<span class={isDir ? "" : "font-bold"}>{fileName}</span>
+						<span class="flex-1"></span>
+						{#if !isDir}
+							<span class="pl-2 text-slate-500">{(size/1000).toFixed(2)} kB</span>
+						{/if}
+						<span class="pl-2 text-slate-500">{new Date(modified).toLocaleString()}</span>
+					</li>
+				</a>
 			{/each}
 		</ul>
 	</div>

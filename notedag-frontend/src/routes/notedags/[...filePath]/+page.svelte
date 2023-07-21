@@ -242,6 +242,12 @@
 										pre.innerText = s;
 										return pre.outerHTML;
 									},
+									'text/html': (s: string) => {
+										let div = document.createElement('div');
+										div.innerHTML = s;
+										console.log('hi');
+										return div.outerHTML;
+									},
 									'image/png': (s: string) => {
 										let img = document.createElement('img');
 										img.src = 'data:image/png;base64,' + s;

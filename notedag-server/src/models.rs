@@ -19,6 +19,9 @@ pub struct ListItem {
     pub file_name: String,
     pub file_path: String,
     pub is_dir: bool,
+    /// in bytes
+    pub size: u64,
+    pub modified: u128,
 }
 
 #[derive(Debug, Deserialize)]

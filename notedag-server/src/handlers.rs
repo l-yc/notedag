@@ -4,6 +4,7 @@ use std::fs;
 use std::convert::Infallible;
 use std::env;
 use std::io::Write;
+use std::time::SystemTime;
 
 use crate::models::ListItem;
 use crate::models::ListOptions;
@@ -29,13 +30,19 @@ pub async fn list(options: ListOptions) -> Result<impl warp::Reply, Infallible> 
         println!("Name: {:?}", path);
 
         let f = path.unwrap();
+        let metadata = f.metadata().unwrap();
+
         let file_name = f.file_name().into_string().unwrap();
         let file_path = f.path().into_os_string().into_string().unwrap();
         let is_dir = f.file_type().unwrap().is_dir();
+        let size = metadata.len();
+        let modified = metadata.modified().unwrap().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
         files.push(ListItem {
             file_name,
             file_path,
             is_dir,
+            size,
+            modified,
         });
     }
 
