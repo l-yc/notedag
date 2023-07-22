@@ -306,6 +306,23 @@
 				try {
 					const { id, name, value, status } = JSON.parse(msg.data);
 
+					const contentTypeHandler: Record<string, ((s: string) => string)> = {
+						'text/plain': (s: string) => {
+							let pre = document.createElement('pre');
+							pre.innerText = s;
+							return pre.outerHTML;
+						},
+						'text/html': (s: string) => {
+							let div = document.createElement('div');
+							div.innerHTML = s;
+							return div.outerHTML;
+						},
+						'image/png': (s: string) => {
+							let img = document.createElement('img');
+							img.src = 'data:image/png;base64,' + s;
+							return img.outerHTML;
+						}
+					};
 
 					if (id !== undefined) {
 						let cell = notedag.cells[id];
@@ -320,28 +337,24 @@
 								else cell.output.error = html;
 								break;
 							case 'result':
-							case 'data':
-								let json: Record<string, string> = JSON.parse(value);
-								const contentTypeHandler: Record<string, ((s: string) => string)> = {
-									'text/plain': (s: string) => {
-										let pre = document.createElement('pre');
-										pre.innerText = s;
-										return pre.outerHTML;
-									},
-									'text/html': (s: string) => {
-										let div = document.createElement('div');
-										div.innerHTML = s;
-										return div.outerHTML;
-									},
-									'image/png': (s: string) => {
-										let img = document.createElement('img');
-										img.src = 'data:image/png;base64,' + s;
-										return img.outerHTML;
+								{
+									let json: Record<string, string> = JSON.parse(value);
+									cell.output.result = '';
+									for (const k of ['text/html', 'text/plain']) {
+										if (k in json) {
+											const v = json[k];	
+											cell.output.result += contentTypeHandler[k](v);
+											break;
+										}
 									}
-								};
-								cell.output.result = '';
-								for (let [k, v] of Object.entries(json)) {
-									cell.output.result += contentTypeHandler[k](v);
+								}
+								break;
+							case 'data':
+								{
+									let json: Record<string, string> = JSON.parse(value);
+									for (let [k, v] of Object.entries(json)) {
+										cell.output.result += contentTypeHandler[k](v);
+									}
 								}
 								break;
 							case 'queued':
