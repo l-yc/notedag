@@ -6,6 +6,7 @@
 	import { registerDocumentKeybindings } from "$lib/keybindings";
 	import { v4 as uuidv4 } from 'uuid';
 	import Convert from 'ansi-to-html';
+	import Cell from "$lib/components/Cell.svelte";
 
 	import { onMount } from 'svelte';
 
@@ -499,7 +500,8 @@
 										<pre class="mx-2">[{cell.output.executionCount}]</pre>
 									</div>
 									<div class="flex-1 flex flex-col">
-										<pre class="p-2 bg-slate-100" contenteditable bind:innerText={cell.code.value}></pre>
+										<!--<pre class="p-2 bg-slate-100" contenteditable bind:innerText={cell.code.value}></pre>-->
+										<Cell bind:state={cell.code} />
 										<!-- FIXME: this is vulnerable to XSS. Ok if we're just running local (trusted) notebooks but we should really fix it -->
 										<div class="p-2">
 											<pre>{@html cell.output.value}</pre>
