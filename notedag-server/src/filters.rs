@@ -61,6 +61,7 @@ mod kernel {
     use crate::models::KernelUpdate;
     use crate::models::RunCell;
     use crate::models::RunCellUpdate;
+    use jupyter_client::responses::ExecutionState;
     use tokio::sync::mpsc::UnboundedSender;
     use warp::Filter;
 
@@ -182,7 +183,8 @@ mod kernel {
                     if let Response::IoPub(response) = msg {
                         let opt = last_run_cell.read().unwrap();
                         let output = opt.as_ref().and_then(|run_cell| {
-                            dbg!(&response);
+                            //dbg!(&response);
+                            dbg!("received IoPub response");
                             match response {
                                 IoPubResponse::Stream { content, .. } => Some(RunCellUpdate {
                                     id: run_cell.id.clone(),
@@ -198,12 +200,20 @@ mod kernel {
                                 },
                                 IoPubResponse::Status { content, .. } => {
                                     println!("status update: {:?}", content);
-                                    None
+                                    match content.execution_state {
+                                        ExecutionState::Busy => None,
+                                        ExecutionState::Idle => Some(RunCellUpdate {
+                                            id: run_cell.id.clone(),
+                                            name: String::from("complete"),
+                                            value: String::from(""),
+                                        }),
+                                        _ => None,
+                                    }
                                 },
                                 IoPubResponse::ExecuteInput { .. } => {
                                     Some(RunCellUpdate {
                                         id: run_cell.id.clone(),
-                                        name: String::from("queued"),
+                                        name: String::from("running"),
                                         value: "*".into(),
                                     })
                                 },
@@ -311,9 +321,10 @@ mod kernel {
         .await;
 
         if let Ok(Response::Shell(ShellResponse::Execute { content, .. })) = response {
+            dbg!(content.execution_count);
             let cell_output = RunCellUpdate {
                 id: run_cell.id.clone(),
-                name: String::from("complete"),
+                name: String::from("count"),
                 value: content.execution_count.to_string(),
             };
 

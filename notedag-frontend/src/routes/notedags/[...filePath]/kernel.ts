@@ -67,7 +67,7 @@ export class KernelManager {
 		}
 	};
 
-	updateCell(cell: CellState, json: any): CellState {
+	updateCell(cell: CellState, json: any): [bool, CellState] {
 		const { id, name, value, status } = json;
 
 		const contentTypeHandler: Record<string, ((s: string) => string)> = {
@@ -121,29 +121,34 @@ export class KernelManager {
 				break;
 			case 'queued':
 			case 'running':
-			case 'complete':
+			case 'count':
 				cell.output.executionCount = value;
 				break;
+			case 'complete':
+				return [true, cell]
 		}
 
-		return cell;
+		return [false, cell]
 	}
 
 	async submit(cell: CellState, callback: (cell: CellState) => void) {
-		const ws = this.connection.ws;
-		if (!ws) throw 'Not connected!';
+		return new Promise((resolve, reject) => {
+			const ws = this.connection.ws;
+			if (!ws) reject('Not connected!');
 
-		console.log('sending', cell.id);
-		this.callbacks[cell.id] = (json: any) => {
-			console.log('updating', json.name, 'from', JSON.stringify(cell));
-			const res = this.updateCell(cell, json);
-			//delete this.callbacks[cell.id];
-			callback(res);
-		}
+			console.log('sending', cell.id);
+			this.callbacks[cell.id] = (json: any) => {
+				console.log('updating', json.name, 'from', JSON.stringify(cell));
+				const [done, res] = this.updateCell(cell, json);
+				//delete this.callbacks[cell.id];
+				callback(res);
+				if (done) resolve(res);
+			}
 
-		ws.send(JSON.stringify({
-			id: cell.id,
-			value: cell.code.value,
-		}));
+			ws.send(JSON.stringify({
+				id: cell.id,
+				value: cell.code.value,
+			}));
+		});
 	}
 }

@@ -18,7 +18,7 @@
 	</div>
 	<div class="flex-1 flex flex-col">
 		<!--<pre class="p-2 bg-slate-100" contenteditable bind:innerText={cell.code.value}></pre>-->
-		<CellInput bind:state={cell.code} />
+		<CellInput bind:state={cell.code} on:run={(_event) => { dispatch('run') }} />
 		<!-- FIXME: this is vulnerable to XSS. Ok if we're just running local (trusted) notebooks but we should really fix it -->
 		<div class="p-2">
 			<pre>{@html cell.output.value}</pre>

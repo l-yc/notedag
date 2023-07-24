@@ -1,8 +1,13 @@
 <script lang="ts">
-	import { EditorView, basicSetup } from "codemirror"
+	import {basicSetup} from "codemirror"
+	import {EditorView, keymap} from "@codemirror/view"
+	import {EditorState} from "@codemirror/state"
+	import {indentWithTab} from "@codemirror/commands"
+
 	import { python } from "@codemirror/lang-python"
 
-	import { onMount } from 'svelte';
+	import { createEventDispatcher, onMount } from 'svelte';
+	const dispatch = createEventDispatcher();
 
 	interface CellCode {
 		value: string;
@@ -16,9 +21,25 @@
 
 	onMount(() => {
 		editor = new EditorView({
-			extensions: [basicSetup, python()],
+			state: EditorState.create({
+				doc: state.value,
+				extensions: [
+					basicSetup,
+					keymap.of([
+						indentWithTab,
+						{
+							key: 'Shift-Enter',
+							run: () => dispatch('run'),
+						}
+					]),
+					python(),
+					EditorView.lineWrapping,
+					EditorView.updateListener.of((update) => {
+						state.value = update.state.doc.toJSON().join('\n');
+					}),
+				],
+			}),
 			parent: editorParent,
-			doc: state.value,
 		})
 	});
 </script>

@@ -66,11 +66,11 @@
 	async function runCell(cellId: UUID) {
 		//await connect();
 		let cell = notedag.cells[cellId];
-		//console.log('sending', cell.code.value);
+		console.log('sending', cell.code.value);
 
 		notedag.clearCell(cell.id);
 		cell.output.executionCount = '.';
-		kernel.submit(cell, (updated) => { 
+		await kernel.submit(cell, (updated) => { 
 			notedag = notedag;
 			console.log('updated', updated);
 		});
