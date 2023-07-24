@@ -13,8 +13,3 @@ export const api = {
 		},
 	})
 }
-
-// for now, we'll connect directly
-export const kernel = {
-	uri: 'ws://127.0.0.1:8080/kernel',
-}

@@ -2,86 +2,83 @@ import { v4 as uuidv4 } from 'uuid';
 
 export type UUID = string;
 
-export class CellInput {
-	constructor(
-		public value: string,
-		public syntax: string,
-	) {}
+export interface CellInputState {
+	value: string;
+	syntax: string;
+}
 
-	static default(): CellInput {
-		return new CellInput('', 'code');
+function defaultCellInput(): CellInputState {
+	return {
+		value: '',
+		syntax: 'code',
 	}
 }
 
-export class CellOutput {
-	constructor(
-		public value: string,
-		public error: string,
-		public result: string,
-		public executionCount: string,
-	) {}
+export interface CellOutputState {
+	value: string;
+	error: string;
+	result: string;
+	executionCount: string;
+}
 
-	static default(): CellOutput {
-		return {
-			value: '',
-			error: '',
-			result: '',
-			executionCount: ' ',
-		}
+function defaultCellOutput(): CellOutputState {
+	return {
+		value: '',
+		error: '',
+		result: '',
+		executionCount: ' ',
 	}
 }
 
-export class Cell {
-	constructor(
-		public id: UUID,
-		public code: CellInput,
-		public meta: object,
-		public output: CellOutput,
-	) {}
+export interface CellState {
+	id: UUID;
+	code: CellInputState;
+	meta: object;
+	output: CellOutputState;
+}
 
-	static default(): Cell {
-		return new Cell(
-			uuidv4() as UUID,
-			CellInput.default(),
-			{},
-			CellOutput.default(),
-		);
-	}
-
-	public clearOutput(): void {
-		this.output = CellOutput.default();
+function defaultCell(): CellState {
+	return {
+		id: uuidv4() as UUID,
+		code: defaultCellInput(),
+		meta: {},
+		output: defaultCellOutput(),
 	}
 }
 
-export class Group {
-	constructor(
-		public id: UUID,
-		public name: string,
-		public cells: UUID[],
-		public children: UUID[],
+function clearOutput(cell: CellState): void {
+	cell.output = defaultCellOutput();
+}
 
-		/// User state
-		public nextChild: UUID | null,
-	) {}
+export interface GroupState {
+	id: UUID;
+	name: string;
+	cells: UUID[];
+	children: UUID[];
 
-	static default(): Group {
-		return {
-			id: uuidv4() as UUID,
-			name: 'untitled group',
-			cells: [],
-			children: [],
-			nextChild: null,
-		}
+	/// User state
+	nextChild: UUID | null;
+}
+
+function defaultGroup(): GroupState {
+	return {
+		id: uuidv4() as UUID,
+		name: 'untitled group',
+		cells: [],
+		children: [],
+		nextChild: null,
 	}
 }
 
-export class NoteDAG {
+export class NoteDAGState {
+	_refresh?: () => void;
+
 	constructor(
 		/// Smallest unit of code
-		public cells: Record<UUID, Cell>,
+		public cells: Record<UUID, CellState>,
 
 		/// Groups cells together with some metadata
-		public groups: Record<UUID, Group>,
+		public groups: Record<UUID, GroupState>,
 
 		/// Entry point for execution
 		public root: UUID,
@@ -89,39 +86,52 @@ export class NoteDAG {
 		/// User state
 		public focusedGroup: UUID = root,
 		public focusedCell: UUID = groups[root].cells[0],
-	) {}
+		public activeGroupChain: GroupState[] = [],
+	) {
+		this.rebuildActiveGroupChain();
+	}
 
-	static default(): NoteDAG {
-		let cells: Record<UUID, Cell> = {};
-		let groups: Record<UUID, Group> = {};
+	static default(): NoteDAGState {
+		let cells: Record<UUID, CellState> = {};
+		let groups: Record<UUID, GroupState> = {};
 
-		let cell = Cell.default();
+		let cell = defaultCell();
 		cells[cell.id] = cell;
 
-		let group = Group.default();
+		let group = defaultGroup();
 		group.cells.push(cell.id);
 		groups[group.id] = group;
 
 		const root = group.id;
 
-		let ret = new NoteDAG(cells, groups, root);
+		let ret = new NoteDAGState(cells, groups, root);
 		return ret;
 	}
 
-	static from_file_data(jsonStr: string): NoteDAG {
+	static load(jsonStr: string, _refresh?: () => void): NoteDAGState {
 		try {
 			const json = JSON.parse(jsonStr);
-			return new NoteDAG(json.cells, json.groups, json.root);
+			let ret = new NoteDAGState(json.cells, json.groups, json.root);
+			ret._refresh = _refresh;
+			return ret;
 		} catch (e) {
 			//console.error('failed to parse NoteDag from JSON:', e);
 			console.log('failed to parse NoteDAG from JSON'); 
-			return NoteDAG.default();
+			return NoteDAGState.default();
 		}
+	}
+
+	refresh() {
+		if (!this._refresh) return false;
+		this._refresh.call(this);
+		return true;
 	}
 
 	/// handlers:focus
 	focusGroup(groupId: UUID) {
+		console.log('focusing', groupId);
 		const group = this.groups[groupId];
+		console.log(this, this.groups, 'focusing', group);
 		const cellId = group.cells.indexOf(this.focusedCell) === -1 ? group.cells[0] : this.focusedCell;
 		this.focusCell(groupId, cellId);
 	}
@@ -129,6 +139,7 @@ export class NoteDAG {
 	focusCell(groupId: UUID, cellId: UUID) {
 		this.focusedGroup = groupId;
 		this.focusedCell = cellId;
+		this.rebuildActiveGroupChain();
 	}
 
 	focusCellBefore(groupId: UUID = this.focusedGroup, cellId: UUID = this.focusedCell) {
@@ -145,11 +156,11 @@ export class NoteDAG {
 
 	/// handlers:add
 	addNewCell(groupId: UUID, idx?: number) {
-		const newCell = Cell.default();
+		const newCell = defaultCell();
 		this.cells[newCell.id] = newCell;
 		if (idx === undefined) this.groups[groupId].cells.push(newCell.id);
 		else this.groups[groupId].cells.splice(idx, 0, newCell.id);
-		this.focusedCell = newCell.id;
+		this.focusCell(groupId, newCell.id);
 	}
 
 	addNewCellBefore(groupId: UUID = this.focusedGroup, cellId: UUID = this.focusedCell) {
@@ -165,11 +176,12 @@ export class NoteDAG {
 	}
 
 	addNewGroup(groupId?: UUID) {
-		const newGroup = Gruop.default();
+		const parent = this.groups[groupId ?? this.focusedGroup];
+
+		const newGroup = defaultGroup();
 		this.groups[newGroup.id] = newGroup;
 		this.addNewCell(newGroup.id);
 		
-		const parent = this.groups[groupId ?? this.focusedGroup];
 		parent.children.push(newGroup.id);
 		parent.nextChild = newGroup.id;
 
@@ -180,13 +192,16 @@ export class NoteDAG {
 	deleteCell(cellId: UUID, groupId: UUID) {
 		delete this.cells[cellId];
 
+		alert('deleting ' + cellId);
 		let group = this.groups[groupId];
 		const idx = group.cells.indexOf(cellId);
 		group.cells.splice(idx, 1);
+		alert(JSON.stringify(group.cells));
 
 		if (this.focusedCell === cellId) {
-			this.focusedCell = group.cells[Math.min(idx, group.cells.length-1)];
-		}
+			alert('updating focused cell');
+			this.focusCell(group.id, group.cells[Math.min(idx, group.cells.length-1)]);
+		} else this.refresh();
 	}
 
 	deleteGroup(groupId: UUID, parentGroupId: UUID) {
@@ -210,39 +225,48 @@ export class NoteDAG {
 		if (this.focusedGroup === groupId) {
 			if (parent.nextChild === null) this.focusGroup(parent.id);
 			else this.focusGroup(parent.nextChild);
-		}
+		} else this.refresh();
 	}
 
 	/// handlers:clear
+	clearCell(cellId: string) {
+		console.log('clearing', cellId);
+		clearOutput(this.cells[cellId]);
+	}
+
 	clearGroup(groupId: string) {
-		let group = this.groups[groupId];
-		for (let id in group.cells) {
-			this.cells[id].clearOutput();
+		const group = this.groups[groupId];
+		console.log(groupId, group.cells);
+		for (const id of group.cells) {
+			this.clearCell(id);
 		}
 	}
 
 	clearOutput() {
-		for (let id in this.cells) {
-			this.cells[id].clearOutput()
+		for (const id in this.cells) {
+			clearOutput(this.cells[id]);
 		}
 	}
 
 	setNextGroup(groupId: string, nextGroupId: string) {
 		this.groups[groupId].nextChild = nextGroupId;
 		this.focusGroup(nextGroupId);
+		this.rebuildActiveGroupChain();
 		console.log('focused', this.focusedGroup);
 	}
 
-	get activeGroupChain(): Group[] {
+	rebuildActiveGroupChain() {
 		let ret = [];
 		let id: string | null = this.root;
-		console.log('starting from', id);
+		//console.log('starting from', id);
 		while (id !== null) {
-			const group: Group = this.groups[id];
+			const group: GroupState = this.groups[id];
 			ret.push(group);
 			id = group.nextChild;
 		}
-		return ret;
+		this.activeGroupChain = ret;
+		console.log('rebuilding');
+		this.refresh();
 	}
 	
 

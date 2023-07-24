@@ -9,9 +9,7 @@
 	export let isFocused: boolean;
 	export let isDeletable: boolean;
 
-	onMount(() => {
-		console.log('got', cell);
-	});
+	onMount(() => {});
 </script>
 
 <li class="flex py-2 border-2 {isFocused ? 'border-blue-500' : 'border-white hover:border-slate-200'}" on:click={(_event) => { dispatch('focus') }}>
