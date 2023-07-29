@@ -6,6 +6,8 @@
 
 	import { python } from "@codemirror/lang-python"
 
+	import { EditorMode } from "$lib";
+
 	import { createEventDispatcher, onMount } from 'svelte';
 	const dispatch = createEventDispatcher();
 
@@ -53,6 +55,9 @@
 					python(),
 					EditorView.lineWrapping,
 					EditorView.updateListener.of((update) => {
+						if (update.focusChanged) {
+							dispatch('mode', editor.hasFocus ? EditorMode.INSERT : EditorMode.NORMAL);
+						}
 						state.value = update.state.doc.toJSON().join('\n');
 					}),
 				],
@@ -60,9 +65,13 @@
 			parent: editorParent,
 		})
 	});
+
+	export function edit() {
+		editor.focus();
+	}
 </script>
 
-<div bind:this={editorParent}></div>
+<div bind:this={editorParent} on:focus={() => { alert(); dispatch('focus') }}></div>
 
 <style lang="postcss">
 	:global(.cm-editor) {

@@ -146,12 +146,26 @@ export class NoteDAGState {
 		const group = this.groups[groupId];
 		const idx = group.cells.indexOf(cellId);
 		if (idx > 0) this.focusCell(groupId, group.cells[idx - 1])
+		else {
+			const gIdx = this.activeGroupChain.indexOf(group);
+			if (gIdx > 0) {
+				const pGroup = this.activeGroupChain[gIdx-1];
+				this.focusCell(pGroup.id, pGroup.cells[pGroup.cells.length-1]);
+			}
+		}
 	}
 
 	focusCellAfter(groupId: UUID = this.focusedGroup, cellId: UUID = this.focusedCell) {
 		const group = this.groups[groupId];
 		const idx = group.cells.indexOf(cellId);
 		if (idx < group.cells.length - 1) this.focusCell(groupId, group.cells[idx + 1])
+		else {
+			const gIdx = this.activeGroupChain.indexOf(group);
+			if (gIdx < this.activeGroupChain.length-1) {
+				const pGroup = this.activeGroupChain[gIdx+1];
+				this.focusCell(pGroup.id, pGroup.cells[0]);
+			}
+		}
 	}
 
 	/// handlers:add

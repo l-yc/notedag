@@ -13,3 +13,8 @@ export const api = {
 		},
 	})
 }
+
+export enum EditorMode {
+	NORMAL = "NORMAL",
+	INSERT = "INSERT",
+}

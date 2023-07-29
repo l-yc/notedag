@@ -1,6 +1,7 @@
 <script lang="ts">
     /** @type {import('./$types').PageData} */
 	export let data : PageData;
+	import { EditorMode } from "$lib";
 	import type { Keybind } from "$lib/keybindings";
 	import { registerDocumentKeybindings } from "$lib/keybindings";
 	import Cell from "$lib/components/Cell.svelte";
@@ -10,8 +11,9 @@
 	//import { KernelManager } from "$lib/kernel";
 	import { KernelManager } from "./kernel";
 
-	import { onMount } from 'svelte';
+	import { onMount, SvelteComponent } from 'svelte';
 	import ChildTab from '$lib/components/ChildTab.svelte';
+	import FaPlus from 'svelte-icons/fa/FaPlus.svelte'
 
 	let notedag: NoteDAGState = NoteDAGState.load(data.contents, () => { notedag = notedag; });
 	let kernel: KernelManager = new KernelManager(() => { kernel = kernel; });
@@ -54,14 +56,21 @@
 			run: () => notedag.focusCellAfter(),
 		  },
 		  {
+			keys: ["i"],
+			description: "Enter edit mode for a cell",
+			run: () => { cellElements[notedag.focusedCell].edit() },
+		  },
+		  {
 			keys: ["Shift-Enter"],
-			description: "Add cell after",
+			description: "Run cell",
 			run: () => runCell(notedag.focusedCell),
 		  },
 		];
 
 		registerDocumentKeybindings(kb);
 	});
+
+	let cellElements: Record<string, SvelteComponent> = {};
 
 	async function runCell(cellId: UUID) {
 		//await connect();
@@ -88,7 +97,14 @@
 			await runGroup(group.id);
 		}
 	}
+
+	let editorMode = EditorMode.NORMAL;
+	let documentLocation = '';
 </script>
+
+<svelte:document on:scroll={(_event) => 
+	documentLocation = `${Math.round(window.scrollY / (document.body.scrollHeight - window.innerHeight) * 100)}%`
+}/>
 
 <div>
 	<Header>
@@ -110,7 +126,7 @@
 	<!--<p>{notedag.focusedGroup}</p>-->
 	<!--<p>{notedag.focusedCell}</p>-->
 
-	<div class="flex flex-col constrained">
+	<div class="h-screen flex flex-col constrained">
 		<ul class="flex flex-col space-y-2">
 			{#each notedag.activeGroupChain as group, idx (group.id)}
 				<li>
@@ -133,10 +149,8 @@
 									on:delete={() => notedag.deleteGroup(childId, notedag.activeGroupChain[idx-1].id)}
 								/>
 							{/each}
-							<a class="flex content-center items-center px-1 clickable" on:click={(_event) => notedag.addNewGroup(notedag.activeGroupChain[idx-1]?.id)}>
-								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-								</svg>
+							<a class="flex content-center items-center clickable w-7 h-7 p-2" on:click={(_event) => notedag.addNewGroup(notedag.activeGroupChain[idx-1]?.id)}>
+								<FaPlus />
 							</a>
 						{/if}
 						<span class="flex-1"></span>
@@ -145,22 +159,33 @@
 						<span class="px-3 clickable" on:click={(_) => notedag.clearGroup(group.id)}>Clear Group</span>
 					</ul>
 
-					<ul class="flex flex-col border-2" on:click={(_event) => notedag.focusGroup(group.id)}>
+					<ul class="-mt-[2px] flex flex-col border-2" on:click={(_event) => notedag.focusGroup(group.id)}>
 						<!--<div>{JSON.stringify(group)}</div>-->
 						{#each group.cells.map(id => notedag.cells[id]) as cell (cell.id)}
 							<!--<pre>{cell.id}</pre>-->
 							<Cell 
+								bind:this={cellElements[cell.id]}
 								bind:cell
 								isFocused={notedag.focusedCell === cell.id}
 								isDeletable={group.cells.length > 1}
 								on:focus={() => notedag.focusCell(group.id, cell.id)}
 								on:delete={() => notedag.deleteCell(cell.id, group.id)}
 								on:run={() => runCell(cell.id)}
+								on:mode={(event) => { editorMode = event.detail }}
 							/>
 						{/each}
 					</ul>
 				</li>
 			{/each}
 		</ul>
+	</div>
+
+	<!-- modal editor status bar -->
+	<div class="w-full fixed bottom-0 bg-white border-t-2 border-slate-500 mt-2 z-10">
+		<div class="flex items-end constrained">
+			<span class="px-2">-- {editorMode} --</span>
+			<span class="flex-1"></span>
+			<span class="px-2">{documentLocation}</span>
+		</div>
 	</div>
 </div>

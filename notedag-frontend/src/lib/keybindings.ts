@@ -34,9 +34,9 @@ function matchKey(combo: string, event: KeyboardEvent): boolean {
 function registerDocumentKeybindings(keybindings: Keybind[]): void {
 	document.onkeydown = function (event: KeyboardEvent) {
 		if (!event.target) return;
-		if (!(event.target as HTMLElement).matches("body")) return; // ignore key press in code editor
+		if ((event.target as HTMLElement).matches(".cm-content")) return; // ignore key press in code editor
 
-		console.log(event);
+		//console.log(event);
 		keybindings.forEach(kb => {
 			if (kb.keys.map((c: string) => matchKey(c, event)).reduce((a, b) => a||b, false)) {
 				event.preventDefault();
