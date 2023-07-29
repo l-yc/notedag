@@ -46,6 +46,11 @@
 			run: () => notedag.addNewCellAfter(),
 		  },
 		  {
+			keys: ["x"],
+			description: "Delete focused cell",
+			run: () => notedag.deleteCell(notedag.focusedCell, notedag.focusedGroup),
+		  },
+		  {
 			keys: ["k"],
 			description: "Focus cell above",
 			run: () => notedag.focusCellBefore(),

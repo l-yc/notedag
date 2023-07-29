@@ -206,14 +206,14 @@ export class NoteDAGState {
 	deleteCell(cellId: UUID, groupId: UUID) {
 		delete this.cells[cellId];
 
-		alert('deleting ' + cellId);
+		console.log('deleting ' + cellId);
 		let group = this.groups[groupId];
 		const idx = group.cells.indexOf(cellId);
 		group.cells.splice(idx, 1);
-		alert(JSON.stringify(group.cells));
+		console.log(group.cells);
 
 		if (this.focusedCell === cellId) {
-			alert('updating focused cell');
+			console.log('updating focused cell');
 			this.focusCell(group.id, group.cells[Math.min(idx, group.cells.length-1)]);
 		} else this.refresh();
 	}
