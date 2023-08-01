@@ -11,6 +11,9 @@ async fn main() {
         // this only shows access logs.
         env::set_var("RUST_LOG", "notedag=info");
     }
+    let port = env::var_os("PORT")
+        .map(|s| s.into_string().unwrap().parse().unwrap())
+        .unwrap_or(8080);
     pretty_env_logger::init();
 
     let (notify_shutdown_tx, notify_shutdown_rx) = tokio::sync::broadcast::channel(1);
@@ -20,10 +23,8 @@ async fn main() {
 
     let routes = api.with(warp::log("notedag"));
 
-    //let server = warp::serve(routes).run(([127, 0, 0, 1], 8080));
-        //.await;
     let (_addr, server) = warp::serve(routes)
-        .bind_with_graceful_shutdown(([127, 0, 0, 1], 8080), async move {
+        .bind_with_graceful_shutdown(([0, 0, 0, 0], port), async move {
             loop {
                 tokio::signal::ctrl_c()
                     .await

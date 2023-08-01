@@ -109,8 +109,8 @@ mod kernel {
 
     // GET /kernel/socket -> websocket upgrade
     pub fn socket(
-        notify_shutdown: tokio::sync::broadcast::Receiver<()>,
-        shutdown_complete_tx: tokio::sync::mpsc::Sender<()>,
+        _notify_shutdown: tokio::sync::broadcast::Receiver<()>,
+        _shutdown_complete_tx: tokio::sync::mpsc::Sender<()>,
     ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
         // Keep track of all connected users, key is usize, value
         // is a websocket sender.

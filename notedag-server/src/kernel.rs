@@ -1,6 +1,7 @@
-use std::{process, collections::HashMap};
+use std::{process, collections::HashMap, fs};
 use jupyter_client::{Client, commands::Command, responses::{Response, ShellResponse}};
 use serde::Serialize;
+use uuid::Uuid;
 
 use std::sync::{
     self,
@@ -12,7 +13,7 @@ use crate::models::RunCell;
 #[derive(Clone, Debug, Serialize)]
 pub struct KernelSpec {
     pub cmd: String,
-    pub args: Vec<String>
+    pub args: Vec<String>,
 }
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -22,7 +23,7 @@ impl KernelSpec {
         Ok(vec![
            KernelSpec {
                cmd: "ipython".into(),
-               args: ["kernel".into(), "-f".into(), "./kernel.json".into()].into(),
+               args: ["kernel".into(), "-f".into()].into(),
            }
         ])
     }
@@ -67,6 +68,7 @@ impl KernelConnection {
 pub struct Kernel {
     pub spec: KernelSpec,
     process: process::Child,
+    pub file: String,
 }
 
 impl Drop for Kernel {
@@ -80,17 +82,24 @@ impl Kernel {
     pub fn shutdown(&mut self) -> Result<()> {
         info!("Shutting down kernel...");
         self.process.kill()?; // FIXME obviously not a good way either
+        fs::remove_file(&self.file)?;
         Ok(())
     }
 
     pub async fn start(spec: &KernelSpec) -> Result<Self> {
+        let file = format!("./kernel-{}.json", Uuid::new_v4());
+        let mut args = spec.args.to_vec();
+        args.push(file.clone());
+        let args = args;
+
         let process = process::Command::new(&spec.cmd)
-            .args(&spec.args)
+            .args(&args)
             .spawn()?;
 
         let kernel = Kernel {
             spec: spec.clone(),
             process,
+            file,
         };
 
         // FIXME obviously not a good solution
@@ -100,13 +109,11 @@ impl Kernel {
     }
 
     pub async fn connect(&self) -> Result<KernelConnection> {
-        let file = std::fs::File::open("./kernel.json").unwrap();
+        let file = std::fs::File::open(&self.file).unwrap();
         //let client = Client::existing().unwrap(); // doesn't work
         let client = Client::from_reader(file).unwrap();
         info!("connected to kernel");
 
-
-        
         Ok(KernelConnection { 
             client,
             last_run_cell: Arc::new(sync::RwLock::new(None)),
