@@ -17,7 +17,7 @@
 	dispatch('focus') 
 }}>
 	{#if isActive}
-		<span class="px-2" contenteditable bind:innerText={name}></span>
+		<span class="px-2 no-kb" contenteditable bind:innerText={name}></span>
 	{:else}
 		<span class="px-2">{name}</span>
 	{/if}

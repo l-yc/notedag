@@ -34,7 +34,10 @@ function matchKey(combo: string, event: KeyboardEvent): boolean {
 function registerDocumentKeybindings(keybindings: Keybind[]): void {
 	document.onkeydown = function (event: KeyboardEvent) {
 		if (!event.target) return;
-		if ((event.target as HTMLElement).matches(".cm-content")) return; // ignore key press in code editor
+		let blacklist = [".cm-content", ".no-kb"]; // ignore key press in code editor
+		for (const cls of blacklist) {
+			if ((event.target as HTMLElement).matches(cls)) return; 
+		}
 
 		//console.log(event);
 		keybindings.forEach(kb => {
