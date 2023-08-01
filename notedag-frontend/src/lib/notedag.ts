@@ -18,6 +18,7 @@ export interface CellOutputState {
 	value: string;
 	error: string;
 	result: string;
+	status: string;
 	executionCount: string;
 }
 
@@ -26,14 +27,14 @@ function defaultCellOutput(): CellOutputState {
 		value: '',
 		error: '',
 		result: '',
-		executionCount: ' ',
+		status: ' ',
+		executionCount: '',
 	}
 }
 
 export interface CellState {
 	id: UUID;
 	code: CellInputState;
-	meta: object;
 	output: CellOutputState;
 }
 
@@ -41,7 +42,6 @@ function defaultCell(): CellState {
 	return {
 		id: uuidv4() as UUID,
 		code: defaultCellInput(),
-		meta: {},
 		output: defaultCellOutput(),
 	}
 }

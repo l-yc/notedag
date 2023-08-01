@@ -6,6 +6,9 @@ use std::env;
 use std::io::Write;
 use std::time::SystemTime;
 
+use futures_util::TryFutureExt;
+
+use crate::kernel::KernelSpec;
 use crate::models::ListItem;
 use crate::models::ListOptions;
 use crate::models::NoteDAG;
@@ -74,3 +77,9 @@ pub async fn write(notedag: NoteDAGWrite) -> Result<impl warp::Reply, Infallible
     println!("Wrote {}", path);
     Ok(warp::reply())
 }
+
+pub async fn list_kernels() -> Result<impl warp::Reply, Infallible> {
+    let kernels = KernelSpec::get_available_kernels().unwrap_or_else(|_| vec![]);
+    Ok(warp::reply::json(&kernels))
+}
+

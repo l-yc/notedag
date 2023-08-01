@@ -2,7 +2,7 @@ import Convert from 'ansi-to-html';
 import type {CellState} from "$lib/notedag";
 
 // for now, we'll connect directly
-const KERNEL_URI = 'ws://127.0.0.1:8080/kernel';
+const KERNEL_URI = 'ws://127.0.0.1:8080/kernel/socket';
 
 export class KernelManager {
 	connection = {
@@ -121,6 +121,8 @@ export class KernelManager {
 				break;
 			case 'queued':
 			case 'running':
+				cell.output.status = value;
+				break;
 			case 'count':
 				cell.output.executionCount = value;
 				break;

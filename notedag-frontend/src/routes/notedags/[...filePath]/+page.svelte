@@ -83,7 +83,7 @@
 		console.log('sending', cell.code.value);
 
 		notedag.clearCell(cell.id);
-		cell.output.executionCount = '.';
+		cell.output.status = '.';
 		await kernel.submit(cell, (updated) => { 
 			notedag = notedag;
 			console.log('updated', updated);

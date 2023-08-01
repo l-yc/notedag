@@ -58,18 +58,19 @@ mod notedag {
 }
 
 mod kernel {
+    use crate::handlers;
+
+    use crate::kernel::Kernel;
+    use crate::kernel::KernelConnection;
+    use crate::kernel::KernelSpec;
     use crate::models::KernelUpdate;
     use crate::models::RunCell;
     use crate::models::RunCellUpdate;
     use jupyter_client::responses::ExecutionState;
-    use tokio::sync::mpsc::UnboundedSender;
     use warp::Filter;
 
     use std::collections::HashMap;
-    use std::process::Child;
-    use std::process;
     use std::sync::{
-        self,
         atomic::{AtomicUsize, Ordering},
         Arc,
     };
@@ -79,9 +80,7 @@ mod kernel {
     use tokio_stream::wrappers::UnboundedReceiverStream;
     use warp::ws::{Message, WebSocket};
 
-    use jupyter_client::commands::Command;
-    use jupyter_client::Client;
-    use jupyter_client::responses::{IoPubResponse, Response, ShellResponse};
+    use jupyter_client::responses::{IoPubResponse, Response};
 
     /// Our global unique user id counter.
     static NEXT_USER_ID: AtomicUsize = AtomicUsize::new(1);
@@ -92,8 +91,18 @@ mod kernel {
     /// - Value is a sender of `warp::ws::Message`
     type Users = Arc<RwLock<HashMap<usize, mpsc::UnboundedSender<Message>>>>;
 
-    // GET /kernel -> websocket upgrade
     pub fn main() -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+        warp::path("kernel").and(list().or(socket()))
+    }
+
+    fn list() -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+        warp::path!("list")
+            .and(warp::get())
+            .and_then(handlers::list_kernels)
+    }
+
+    // GET /kernel/socket -> websocket upgrade
+    pub fn socket() -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
         // Keep track of all connected users, key is usize, value
         // is a websocket sender.
         let users = Users::default();
@@ -101,16 +110,7 @@ mod kernel {
         let users = warp::any().map(move || users.clone());
 
 
-        let _kernel: Child = process::Command::new("ipython")
-            .args(["kernel", "-f", "./kernel.json"])
-            .spawn()
-            .unwrap();
-        // FIXME obviously not a good solution
-        std::thread::sleep(std::time::Duration::from_millis(5000));
-        println!("kernel started");
-
-
-        warp::path("kernel")
+        warp::path("socket")
             // The `ws()` filter will prepare Websocket handshake...
             .and(warp::ws())
             .and(users)
@@ -153,38 +153,34 @@ mod kernel {
 
         // Return a `Future` that is basically a state machine managing
         // this specific user's connection.
+        let spec: Vec<KernelSpec> = KernelSpec::get_available_kernels().unwrap();
+        let kernel = Kernel::start(&spec[0]).await.unwrap();
 
-        let file = std::fs::File::open("./kernel.json").unwrap();
-        //let client = Client::existing().unwrap(); // doesn't work
-        let client = Client::from_reader(file).unwrap();
-        println!("connected to kernel");
+        let conn = kernel.connect().await.unwrap();
         let new_msg = serde_json::to_string(&KernelUpdate { status: "ready".into() }).unwrap();
-        tx.send(Message::text(new_msg)).unwrap();
-
+        tx.send(Message::text(new_msg)).unwrap();        
 
         // Set up the heartbeat watcher
-        let hb_receiver = client.heartbeat().unwrap();
+        let hb_receiver = conn.client.heartbeat().unwrap();
         std::thread::spawn(move || {
             for _ in hb_receiver {
-                //println!("Received heartbeat from kernel");
+                debug!("Received heartbeat from kernel");
             }
         });
-
-        let last_run_cell: Arc<sync::RwLock<Option<RunCell>>> = Arc::new(sync::RwLock::new(None));
 
         // Spawn an IOPub watcher
         {
             let tx = tx.clone();
-            let last_run_cell = Arc::clone(&last_run_cell);
-            let receiver = client.iopub_subscribe().unwrap();
+            let last_run_cell = Arc::clone(&conn.last_run_cell);
+            let receiver = conn.client.iopub_subscribe().unwrap();
             std::thread::spawn(move || {
                 for msg in receiver {
                     //println!("Received message from kernel: {:#?}", msg);
                     if let Response::IoPub(response) = msg {
                         let opt = last_run_cell.read().unwrap();
                         let output = opt.as_ref().and_then(|run_cell| {
-                            //dbg!(&response);
-                            dbg!("received IoPub response");
+                            dbg!(&response);
+                            //dbg!("received IoPub response");
                             match response {
                                 IoPubResponse::Stream { content, .. } => Some(RunCellUpdate {
                                     id: run_cell.id.clone(),
@@ -236,8 +232,7 @@ mod kernel {
                         });
 
                         if let Some(thing) = output {
-                            let new_msg = serde_json::to_string(&thing).unwrap();
-                            tx.send(Message::text(new_msg)).unwrap();
+                            tx.send(thing.into()).unwrap();
                         }
                     }
                 }
@@ -245,7 +240,7 @@ mod kernel {
         }
 
         {
-            let client = Arc::new(Mutex::new(client));
+            let conn = Arc::new(Mutex::new(conn));
 
             while let Some(result) = user_ws_rx.next().await {
                 let msg = match result {
@@ -258,9 +253,8 @@ mod kernel {
                 user_message(
                     my_id,
                     msg,
-                    &tx,
-                    Arc::clone(&client),
-                    Arc::clone(&last_run_cell),
+                    tx.clone(),
+                    Arc::clone(&conn),
                 )
                 .await;
             }
@@ -274,9 +268,8 @@ mod kernel {
     async fn user_message(
         my_id: usize,
         msg: Message,
-        tx: &UnboundedSender<Message>,
-        client: Arc<Mutex<Client>>,
-        last_run_cell: Arc<sync::RwLock<Option<RunCell>>>,
+        tx: mpsc::UnboundedSender<Message>,
+        conn: Arc<Mutex<KernelConnection>>,
     ) {
         // Skip any non-Text messages...
         let msg = if let Ok(s) = msg.to_str() {
@@ -287,51 +280,25 @@ mod kernel {
         println!("received from {}: {}", my_id, msg);
 
         let run_cell: RunCell = serde_json::from_str(msg).unwrap();
-        {
-            let mut r = last_run_cell.write().unwrap();
-            *r = Some(run_cell.clone());
-        }
-        println!("submitting: {}", run_cell.value);
 
-        // Command to run
-        let command = Command::Execute {
-            code: run_cell.value.to_string(),
-            silent: false,
-            store_history: true,
-            user_expressions: HashMap::new(),
-            allow_stdin: true,
-            stop_on_error: false,
-        };
-
-        let cell_output = RunCellUpdate {
+        // Send update to subscriber
+        let _ = tx.send(RunCellUpdate {
             id: run_cell.id.clone(),
             name: String::from("queued"),
             value: ":".into(),
-        };
+        }.into());
 
-        let new_msg = serde_json::to_string(&cell_output).unwrap();
-        tx.send(Message::text(new_msg)).unwrap();
-
-        // Run some code on the kernel
         // This is a slow but blocking step, so we're going to toss it into a tokio spawn.
-        let response = tokio::task::spawn(async move {
-            let c = client.lock().await;
-            c.send_shell_command(command).unwrap()
-        })
-        .await;
+        tokio::task::spawn(async move {
+            let conn = conn.lock().await;
+            let execution_count = conn.run_cell(run_cell.clone()).unwrap();
 
-        if let Ok(Response::Shell(ShellResponse::Execute { content, .. })) = response {
-            dbg!(content.execution_count);
-            let cell_output = RunCellUpdate {
+            let _ = tx.send(RunCellUpdate {
                 id: run_cell.id.clone(),
                 name: String::from("count"),
-                value: content.execution_count.to_string(),
-            };
-
-            let new_msg = serde_json::to_string(&cell_output).unwrap();
-
-            tx.send(Message::text(new_msg)).unwrap();
-        }
+                value: execution_count.to_string(),
+            }.into());
+        });
     }
 
     async fn user_disconnected(my_id: usize, users: &Users) {

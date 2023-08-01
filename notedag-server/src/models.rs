@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use warp::ws::Message;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -44,6 +45,14 @@ pub struct RunCellUpdate {
     pub name: String,
     pub value: String,
 }
+
+impl Into<Message> for RunCellUpdate {
+    fn into(self) -> Message {
+        let new_msg = serde_json::to_string(&self).unwrap();
+        Message::text(new_msg)
+    }
+}
+
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

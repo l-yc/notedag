@@ -30,7 +30,7 @@
 	tabindex="-1"
 >
 	<div class="flex flex-col w-14 items-end">
-		<pre class="mx-2">[{cell.output.executionCount}]</pre>
+		<pre class="mx-2">[{cell.output.executionCount || cell.output.status}]</pre>
 	</div>
 	<div class="flex-1 flex flex-col">
 		<!--<pre class="p-2 bg-slate-100" contenteditable bind:innerText={cell.code.value}></pre>-->

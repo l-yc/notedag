@@ -1,3 +1,6 @@
+extern crate pretty_env_logger;
+#[macro_use] extern crate log;
+
 use std::env;
 use warp::Filter;
 
@@ -12,7 +15,7 @@ async fn main() {
 
     let api = filters::api();
 
-    let routes = api.with(warp::log("todos"));
+    let routes = api.with(warp::log("notedag"));
 
     warp::serve(routes).run(([127, 0, 0, 1], 8080)).await;
 }
@@ -20,3 +23,4 @@ async fn main() {
 mod filters;
 mod models;
 mod handlers;
+mod kernel;
