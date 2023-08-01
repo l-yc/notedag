@@ -1,7 +1,10 @@
 use warp::Filter;
 
-pub fn api() -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    checkhealth().or(notedag::main()).or(kernel::main())
+pub fn api(
+    notify_shutdown: tokio::sync::broadcast::Receiver<()>,
+    shutdown_complete_tx: tokio::sync::mpsc::Sender<()>,
+) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+    checkhealth().or(notedag::main()).or(kernel::main(notify_shutdown, shutdown_complete_tx))
 }
 
 fn checkhealth() -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone
@@ -91,8 +94,11 @@ mod kernel {
     /// - Value is a sender of `warp::ws::Message`
     type Users = Arc<RwLock<HashMap<usize, mpsc::UnboundedSender<Message>>>>;
 
-    pub fn main() -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-        warp::path("kernel").and(list().or(socket()))
+    pub fn main(
+        notify_shutdown: tokio::sync::broadcast::Receiver<()>,
+        shutdown_complete_tx: tokio::sync::mpsc::Sender<()>,
+    ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+        warp::path("kernel").and(list().or(socket(notify_shutdown, shutdown_complete_tx)))
     }
 
     fn list() -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
@@ -102,7 +108,10 @@ mod kernel {
     }
 
     // GET /kernel/socket -> websocket upgrade
-    pub fn socket() -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+    pub fn socket(
+        notify_shutdown: tokio::sync::broadcast::Receiver<()>,
+        shutdown_complete_tx: tokio::sync::mpsc::Sender<()>,
+    ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
         // Keep track of all connected users, key is usize, value
         // is a websocket sender.
         let users = Users::default();
@@ -120,7 +129,10 @@ mod kernel {
             })
     }
 
-    async fn user_connected(ws: WebSocket, users: Users) {
+    async fn user_connected(
+        ws: WebSocket,
+        users: Users,
+    ) {
         // Use a counter to assign a new unique ID for this user.
         let my_id = NEXT_USER_ID.fetch_add(1, Ordering::Relaxed);
 

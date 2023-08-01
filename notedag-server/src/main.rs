@@ -13,11 +13,30 @@ async fn main() {
     }
     pretty_env_logger::init();
 
-    let api = filters::api();
+    let (notify_shutdown_tx, notify_shutdown_rx) = tokio::sync::broadcast::channel(1);
+    let (shutdown_complete_tx, mut shutdown_complete_rx) = tokio::sync::mpsc::channel(1);
+
+    let api = filters::api(notify_shutdown_rx, shutdown_complete_tx);
 
     let routes = api.with(warp::log("notedag"));
 
-    warp::serve(routes).run(([127, 0, 0, 1], 8080)).await;
+    //let server = warp::serve(routes).run(([127, 0, 0, 1], 8080));
+        //.await;
+    let (_addr, server) = warp::serve(routes)
+        .bind_with_graceful_shutdown(([127, 0, 0, 1], 8080), async move {
+            loop {
+                tokio::signal::ctrl_c()
+                    .await
+                    .expect("failed to listen to shutdown signal");
+                info!("ctrl c received, shutting down gracefully");
+                let _ = notify_shutdown_tx.send(());
+                let _ = shutdown_complete_rx.recv().await;
+                break;
+            }
+        });
+
+    info!("listening on {}", _addr); 
+    server.await;
 }
 
 mod filters;

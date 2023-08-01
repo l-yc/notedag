@@ -72,12 +72,17 @@ pub struct Kernel {
 impl Drop for Kernel {
     fn drop(&mut self) {
         // kill child once the Kernel object goes out of scope
-        info!("Shutting down kernel...");
-        self.process.kill().unwrap();
+        self.shutdown().expect("Failed to shutdown kernel");
     }
 }
 
 impl Kernel {
+    pub fn shutdown(&mut self) -> Result<()> {
+        info!("Shutting down kernel...");
+        self.process.kill()?; // FIXME obviously not a good way either
+        Ok(())
+    }
+
     pub async fn start(spec: &KernelSpec) -> Result<Self> {
         let process = process::Command::new(&spec.cmd)
             .args(&spec.args)
