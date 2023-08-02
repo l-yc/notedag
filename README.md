@@ -4,6 +4,8 @@ wip experimental tree-like jupyter frontend built with rust and svelte
 
 ## build
 
+must build server after frontend because static files are embedded into the emitted binary
+
 ```sh
 cd notedag-frontend
 npm run build
@@ -13,7 +15,7 @@ cd notedag-server
 cargo build --release
 cd ..
 
-ROOT=./tests/ APP=./notedag-frontend/build ./notedag-server/target/release/notedag-server
+ROOT=./tests/ ./notedag-server/target/release/notedag-server
 ```
 
 ## dev

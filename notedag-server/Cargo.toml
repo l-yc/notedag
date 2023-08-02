@@ -9,7 +9,9 @@ edition = "2021"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 jupyter-client = { version = "0.1", git = "https://github.com/l-yc/rust-jupyter-client" }
 log = "0.4"
+mime_guess = "2.0.4"
 pretty_env_logger = "0.4"
+rust-embed = "6.8.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
