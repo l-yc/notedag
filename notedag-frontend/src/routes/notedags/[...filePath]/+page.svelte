@@ -1,7 +1,7 @@
 <script lang="ts">
     /** @type {import('./$types').PageData} */
 	export let data : PageData;
-	import { EditorMode } from "$lib";
+	import { EditorMode, api } from "$lib";
 	import type { Keybind } from "$lib/keybindings";
 	import { registerDocumentKeybindings } from "$lib/keybindings";
 	import Cell from "$lib/components/Cell.svelte";
@@ -20,9 +20,8 @@
 
 	/// handlers
 	async function save(filePath: string) {
-		const response = await api.post("notedag/write", { filePath, contents: JSON.stringify(notedag) });
-		const json = await response.json();
-		alert(JSON.stringify(json));
+		const _ = await api.post("notedag/write", { filePath, contents: JSON.stringify(notedag) });
+		alert('saved');
 	}
 
 	/// lifecycle

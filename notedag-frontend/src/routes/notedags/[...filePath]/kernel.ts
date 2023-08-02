@@ -1,8 +1,6 @@
 import Convert from 'ansi-to-html';
 import type {CellState} from "$lib/notedag";
-
-// for now, we'll connect directly
-const KERNEL_URI = 'ws://127.0.0.1:8080/kernel/socket';
+import { KERNEL_URI } from '$lib';
 
 export class KernelManager {
 	connection = {
@@ -24,7 +22,7 @@ export class KernelManager {
 				return;
 			} 
 
-			let ws = new WebSocket(KERNEL_URI);
+			let ws = new WebSocket(KERNEL_URI());
 			this.connection = {
 				ws,
 				status: 'connecting',

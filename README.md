@@ -18,6 +18,14 @@ cd ..
 ROOT=./tests/ ./notedag-server/target/release/notedag-server
 ```
 
+to build the binary statically
+
+```sh
+PKG_CONFIG_ALLOW_CROSS=1 cargo build --release --target x86_64-unknown-linux-musl
+```
+
+note that you will need to install zeromq 
+
 ## dev
 
 ### notedag-frontend

@@ -55,12 +55,16 @@ async fn main() {
     let (notify_shutdown_tx, notify_shutdown_rx) = tokio::sync::broadcast::channel(1);
     let (shutdown_complete_tx, mut shutdown_complete_rx) = tokio::sync::mpsc::channel(1);
 
+    let cors = warp::cors()
+        .allow_any_origin()
+        .allow_headers(vec!["Content-Type"])
+        .allow_methods(vec!["GET", "POST"]);
     let api = filters::api(notify_shutdown_rx, shutdown_complete_tx)
-        .with(warp::cors().allow_any_origin());
+        .with(cors);
     let app = app::main();
 
     let routes = app.or(api)
-        .with(warp::log("notedag"));
+        .with(warp::log("notedag_api"));
 
     let (_addr, server) = warp::serve(routes)
         .bind_with_graceful_shutdown(([0, 0, 0, 0], port), async move {
