@@ -11,17 +11,25 @@ async fn main() {
         // this only shows access logs.
         env::set_var("RUST_LOG", "notedag=info");
     }
+    pretty_env_logger::init();
+
     let port = env::var_os("PORT")
         .map(|s| s.into_string().unwrap().parse().unwrap())
         .unwrap_or(8080);
-    pretty_env_logger::init();
+
+    let app_root = env::var_os("APP")
+        .map(|s| s.into_string().unwrap())
+        .unwrap_or("../notedag-frontend/build".into());
 
     let (notify_shutdown_tx, notify_shutdown_rx) = tokio::sync::broadcast::channel(1);
     let (shutdown_complete_tx, mut shutdown_complete_rx) = tokio::sync::mpsc::channel(1);
 
-    let api = filters::api(notify_shutdown_rx, shutdown_complete_tx);
+    let api = filters::api(notify_shutdown_rx, shutdown_complete_tx)
+        .with(warp::cors().allow_any_origin());
+    let app = warp::fs::dir(app_root.clone());
 
-    let routes = api.with(warp::log("notedag"));
+    let routes = app.or(api)
+        .with(warp::log("notedag"));
 
     let (_addr, server) = warp::serve(routes)
         .bind_with_graceful_shutdown(([0, 0, 0, 0], port), async move {
@@ -37,6 +45,7 @@ async fn main() {
         });
 
     info!("listening on {}", _addr); 
+    info!("serving from {}", app_root); 
     server.await;
 }
 

@@ -20,13 +20,7 @@
 
 	/// handlers
 	async function save(filePath: string) {
-		const response = await fetch("/api/write", {
-			method: "POST",
-			body: JSON.stringify({ filePath, contents: JSON.stringify(notedag) }),
-			headers: {
-				"Content-Type": "application/json",
-			},
-		});
+		const response = await api.post("notedag/write", { filePath, contents: JSON.stringify(notedag) });
 		const json = await response.json();
 		alert(JSON.stringify(json));
 	}
@@ -132,7 +126,7 @@
 	<!--<p>{notedag.focusedCell}</p>-->
 
 	<div class="h-screen flex flex-col constrained">
-		<ul class="flex flex-col space-y-2">
+		<ul class="flex flex-col space-y-2 pb-16">
 			{#each notedag.activeGroupChain as group, idx (group.id)}
 				<li>
 					<ul class="flex">

@@ -2,6 +2,7 @@
     /** @type {import('./$types').PageData} */
 	export let data;
 	import Header from "$lib/components/Header.svelte";
+	import { api } from '$lib';
 
 	$: cwd = data.root === '' ? '.' : './' + data.root;
 
@@ -16,13 +17,7 @@
 	async function addNewND(pathname, event) {
 		const newFile = getLoc(pathname, 'untitled.ind');
 
-		const response = await fetch("/api/create", {
-			method: "POST",
-			body: JSON.stringify({ filePath: newFile }),
-			headers: {
-				"Content-Type": "application/json",
-			},
-		});
+		const _ = await api.post('notedag/create', { filePath: newFile });
 
 		const newPath = `/notedags/${newFile}`;
 

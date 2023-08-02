@@ -57,7 +57,6 @@ impl KernelConnection {
         let response = self.client.send_shell_command(command);
 
         if let Ok(Response::Shell(ShellResponse::Execute { content, .. })) = response {
-            dbg!(content.execution_count);
             Ok(content.execution_count)
         } else {
             Err("failed to run code".into())

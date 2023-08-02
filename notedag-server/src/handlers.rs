@@ -6,8 +6,6 @@ use std::env;
 use std::io::Write;
 use std::time::SystemTime;
 
-use futures_util::TryFutureExt;
-
 use crate::kernel::KernelSpec;
 use crate::models::ListItem;
 use crate::models::ListOptions;

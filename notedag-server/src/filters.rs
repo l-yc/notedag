@@ -191,8 +191,8 @@ mod kernel {
                     if let Response::IoPub(response) = msg {
                         let opt = last_run_cell.read().unwrap();
                         let output = opt.as_ref().and_then(|run_cell| {
-                            dbg!(&response);
-                            //dbg!("received IoPub response");
+                            //dbg!(&response);
+                            dbg!("received IoPub response");
                             match response {
                                 IoPubResponse::Stream { content, .. } => Some(RunCellUpdate {
                                     id: run_cell.id.clone(),
